@@ -1,4 +1,4 @@
-const BASE_URL = 'https://api.rawg.io/api';
+const BASE_URL = 'https://api.rawg.io/api/';
 
 export class RawgApiError extends Error {
   public readonly status: number;
@@ -13,13 +13,15 @@ type ParamValue = string | number | boolean | null | undefined | (string | numbe
 type Params = Record<string, ParamValue>;
 
 function buildUrl(path: string, apiKey: string, params: Params) {
-  const url = new URL(path, BASE_URL);
+  const safePath = path.replace(/^\/+/, '');
+  const url = new URL(safePath, BASE_URL);
   url.searchParams.set('key', apiKey);
   for (const [k, v] of Object.entries(params)) {
     if (v == null) continue;
     if (Array.isArray(v)) url.searchParams.set(k, v.join(','));
     else url.searchParams.set(k, String(v));
   }
+  console.log('[RAWG 요청 URL]', url.toString());
   return url.toString();
 }
 
