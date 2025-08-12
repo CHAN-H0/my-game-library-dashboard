@@ -25,6 +25,11 @@ export function useInfiniteGames(filters: GameFilters) {
       }
     },
     placeholderData: keepPreviousData,
-    staleTime: 30_000,
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   });
 }
