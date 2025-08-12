@@ -1,11 +1,19 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { games } from '@/services/rawg/games';
+import { GameFilters, normalizeFilters } from '@/app/games/_utils/filters';
 
-export function useGames() {
+export function useInfiniteGames(filters: GameFilters) {
+  const normalized = useMemo(() => normalizeFilters(filters), [filters]);
+
   return useInfiniteQuery({
-    queryKey: ['games'],
+    queryKey: ['games', normalized],
     initialPageParam: 1,
-    queryFn: ({ pageParam }) => games.list({ page: pageParam }),
+    queryFn: ({ pageParam }) =>
+      games.list({
+        page: pageParam,
+        ...normalized,
+      }),
     getNextPageParam: (lastPage) => {
       if (!lastPage.next) return undefined;
       try {
@@ -16,5 +24,7 @@ export function useGames() {
         return undefined;
       }
     },
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 }
