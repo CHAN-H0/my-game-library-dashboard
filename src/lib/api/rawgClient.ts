@@ -9,8 +9,8 @@ export class RawgApiError extends Error {
   }
 }
 
-type ParamValue = string | number | boolean | null | undefined | (string | number)[];
-type Params = Record<string, ParamValue>;
+export type ParamValue = string | number | boolean | null | undefined | (string | number)[];
+export type Params = Record<string, ParamValue>;
 
 function buildUrl(path: string, apiKey: string, params: Params) {
   const safePath = path.replace(/^\/+/, '');
@@ -21,7 +21,8 @@ function buildUrl(path: string, apiKey: string, params: Params) {
     if (Array.isArray(v)) url.searchParams.set(k, v.join(','));
     else url.searchParams.set(k, String(v));
   }
-  console.log('[RAWG 요청 URL]', url.toString());
+  // 개발 중 확인용
+  // console.log('[RAWG 요청 URL]', url.toString());
   return url.toString();
 }
 
@@ -40,8 +41,41 @@ async function safeParseError(res: Response) {
   return msg;
 }
 
+function createAbortError(message = 'Aborted') {
+  const err = new Error(message);
+  (err as any).name = 'AbortError';
+  return err;
+}
+
+function waitWithAbort(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      cleanup();
+      reject(createAbortError());
+    };
+    const cleanup = () => {
+      clearTimeout(t);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    if (signal) {
+      if (signal.aborted) return onAbort();
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+}
+
+export type GetOptions = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  maxRetries?: number;
+};
+
 export const rawgClient = {
-  async get<T>(path: string, params: Params = {}, options: RequestInit = {}): Promise<T> {
+  async get<T>(path: string, params: Params = {}, opts: GetOptions = {}): Promise<T> {
     const apiKey = process.env.NEXT_PUBLIC_RAWG_API_KEY;
     if (!apiKey) {
       throw new Error(
@@ -51,28 +85,48 @@ export const rawgClient = {
 
     const url = buildUrl(path, apiKey, params);
 
+    const { signal, timeoutMs = 10_000, maxRetries = 1 } = opts;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
 
-    let response: Response;
+    if (signal) {
+      if (signal.aborted) ctrl.abort();
+      else signal.addEventListener('abort', () => ctrl.abort(), { once: true });
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    }
+
     try {
-      response = await fetch(url, { cache: 'no-store', signal: ctrl.signal, ...options });
-    } catch (e: any) {
-      clearTimeout(timer);
-      throw new RawgApiError(0, e?.message || '네트워크 오류가 발생했습니다.');
-    }
-    clearTimeout(timer);
+      const response = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: ctrl.signal,
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        const retryAfter = Number(response.headers.get('retry-after')) || 1;
-        await new Promise((r) => setTimeout(r, retryAfter * 1000));
-        return this.get<T>(path, params, options);
+      if (!response.ok) {
+        if (response.status === 429 && maxRetries > 0) {
+          const retryAfter = Number(response.headers.get('retry-after')) || 1;
+          await waitWithAbort(retryAfter * 1000, signal ?? ctrl.signal);
+          return this.get<T>(path, params, {
+            signal,
+            timeoutMs,
+            maxRetries: maxRetries - 1,
+          });
+        }
+
+        const message = await safeParseError(response);
+        throw new RawgApiError(response.status, message);
       }
-      const message = await safeParseError(response);
-      throw new RawgApiError(response.status, message);
+
+      return (await response.json()) as T;
+    } catch (e: any) {
+      if (e?.name === 'AbortError') throw e;
+      throw new RawgApiError(0, e?.message || '네트워크 오류가 발생했습니다.');
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-    return response.json() as Promise<T>;
   },
 };
 

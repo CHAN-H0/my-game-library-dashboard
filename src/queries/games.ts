@@ -9,11 +9,7 @@ export function useInfiniteGames(filters: GameFilters) {
   return useInfiniteQuery({
     queryKey: ['games', normalized],
     initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
-      games.list({
-        page: pageParam,
-        ...normalized,
-      }),
+    queryFn: ({ pageParam, signal }) => games.list({ page: pageParam, ...normalized }, { signal }),
     getNextPageParam: (lastPage) => {
       if (!lastPage.next) return undefined;
       try {
