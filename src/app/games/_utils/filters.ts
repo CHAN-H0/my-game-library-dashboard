@@ -16,7 +16,7 @@ export type Ordering =
 
 export interface GameFilters {
   search?: string;
-  genres?: number[];
+  genres?: string[];
   platforms?: number[];
   ordering?: Ordering;
   page_size?: number;
@@ -31,44 +31,57 @@ function parseCsvNumbers(input: string | null | undefined): number[] | undefined
   return nums.length ? nums : undefined;
 }
 
-function toCsv(nums: number[] | undefined): string | undefined {
-  if (!nums || nums.length === 0) return undefined;
-  return nums.join(',');
+function parseCsvStrings(input: string | null | undefined): string[] | undefined {
+  if (!input) return undefined;
+  const arr = input
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return arr.length ? arr : undefined;
 }
+
+function toCsv<T extends string | number>(vals: T[] | undefined): string | undefined {
+  if (!vals || vals.length === 0) return undefined;
+  return vals.join(',');
+}
+
+const ALLOWED_ORDERING = new Set<Ordering>([
+  'name',
+  '-name',
+  'released',
+  '-released',
+  'added',
+  '-added',
+  'created',
+  '-created',
+  'updated',
+  '-updated',
+  'rating',
+  '-rating',
+  'metacritic',
+  '-metacritic',
+]);
 
 export function parseGameFilters(searchParams: URLSearchParams): GameFilters {
   const search = searchParams.get('search') ?? undefined;
-  const genres = parseCsvNumbers(searchParams.get('genres'));
+  const genres = parseCsvStrings(searchParams.get('genres'));
   const platforms = parseCsvNumbers(searchParams.get('platforms'));
 
   const orderingRaw = searchParams.get('ordering') ?? undefined;
-  const allowed: Set<string> = new Set([
-    'name',
-    '-name',
-    'released',
-    '-released',
-    'added',
-    '-added',
-    'created',
-    '-created',
-    'updated',
-    '-updated',
-    'rating',
-    '-rating',
-    'metacritic',
-    '-metacritic',
-  ]);
-  const ordering = orderingRaw && allowed.has(orderingRaw) ? (orderingRaw as Ordering) : undefined;
+  const ordering =
+    orderingRaw && ALLOWED_ORDERING.has(orderingRaw as Ordering)
+      ? (orderingRaw as Ordering)
+      : undefined;
 
   const pageSizeStr = searchParams.get('page_size');
-  const page_size = pageSizeStr ? Number(pageSizeStr) : undefined;
+  const pageSizeNum = pageSizeStr ? Number(pageSizeStr) : NaN;
 
   return {
     search: search?.trim() ? search.trim() : undefined,
     genres,
     platforms,
     ordering,
-    page_size: Number.isFinite(page_size!) ? page_size : undefined,
+    page_size: Number.isFinite(pageSizeNum) ? pageSizeNum : undefined,
   };
 }
 
@@ -89,7 +102,7 @@ export function normalizeFilters(
 ): Required<Pick<GameFilters, never>> & GameFilters {
   return {
     ...filters,
-    genres: filters.genres ? [...filters.genres].sort((a, b) => a - b) : undefined,
+    genres: filters.genres ? [...filters.genres].sort() : undefined,
     platforms: filters.platforms ? [...filters.platforms].sort((a, b) => a - b) : undefined,
     search: filters.search?.trim() || undefined,
   };

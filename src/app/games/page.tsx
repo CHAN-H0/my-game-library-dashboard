@@ -19,6 +19,7 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select';
+import SearchBar from '@/components/games/SearchBar';
 
 export default function GamesPage() {
   const router = useRouter();
@@ -78,6 +79,9 @@ export default function GamesPage() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SearchBar placeholder="게임 검색 (Enter)" className="max-w-md" />
+        </div>
         <Select value={orderingValue} onValueChange={onChangeOrdering}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="정렬" />
