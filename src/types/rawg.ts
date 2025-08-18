@@ -4,13 +4,26 @@ export type GameSummary = {
   background_image?: string | null;
   released?: string | null;
   rating?: number;
-  genres?: { id: number; name: string }[];
-  platforms?: { platform: { id: number; name: string } }[];
+  genres?: Genre[];
+  platforms?: { platform: Platform }[];
 };
 
-export type GamesListResponse = {
+export type RawgListResponse<T> = {
   count: number;
   next: string | null;
   previous: string | null;
-  results: GameSummary[];
+  results: T[];
 };
+export type GamesListResponse = RawgListResponse<GameSummary>;
+
+export interface Genre {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface Platform {
+  id: number;
+  name: string;
+  slug: string;
+}
