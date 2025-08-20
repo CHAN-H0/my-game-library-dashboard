@@ -118,3 +118,17 @@ export function mergeFilters(base: GameFilters, partial: Partial<GameFilters>): 
 
   return next;
 }
+
+export function resetGameFilters(
+  current: GameFilters,
+  opts: { keepOrdering?: boolean; keepPageSize?: boolean } = {
+    keepOrdering: true,
+    keepPageSize: true,
+  }
+): GameFilters {
+  const next: GameFilters = {};
+  if (opts.keepOrdering && current.ordering) next.ordering = current.ordering;
+  if (opts.keepPageSize && typeof current.page_size === 'number')
+    next.page_size = current.page_size;
+  return next;
+}
