@@ -14,6 +14,8 @@ import { useInfiniteGames } from '@/queries/games';
 import GameGrid from '@/components/GameGrid';
 import { Button } from '@/components/ui/button';
 import FiltersResetButton from '@/components/games/FiltersResetButton';
+import ErrorBanner from '@/components/games/ErrorBanner';
+import EmptyState from '@/components/games/EmptyState';
 import {
   Select,
   SelectTrigger,
@@ -73,18 +75,12 @@ export default function GamesPage() {
   const showInitialLoading = (isPending || (!data && isFetching)) && items.length === 0;
   if (showInitialLoading) return <div className="p-6">로딩 중…</div>;
 
-  if (isError) {
-    const e = error as any;
-    return (
-      <div className="p-6 text-red-600">
-        에러: {e?.message || '알 수 없는 에러'}
-        {'status' in e && e?.status ? ` (HTTP ${e.status})` : null}
-      </div>
-    );
-  }
-
   const orderingValue = filters.ordering ?? 'popularity';
   const isBackgroundUpdating = isFetching && !isFetchingNextPage && items.length > 0;
+  const isEmpty = !isPending && !isFetching && !isError && items.length === 0;
+
+  const errorMessage = (error as any)?.message as string | undefined;
+  const errorStatus = (error as any)?.status ? `HTTP ${(error as any).status}` : undefined;
 
   return (
     <div className="space-y-4 p-6">
@@ -146,15 +142,18 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {items.length === 0 ? (
-        <div>결과가 없어요.</div>
+      {isError && (
+        <ErrorBanner message={errorMessage} statusText={errorStatus} onRetry={() => refetch()} />
+      )}
+
+      {isEmpty ? (
+        <EmptyState onReset={handleResetFilters} />
       ) : (
         <>
           <div className="mb-4 text-sm text-gray-500">{items.length}개 표시</div>
           <div className="space-y-6">
             <GameGrid games={items} />
           </div>
-
           {hasNextPage && (
             <Button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
               {isFetchingNextPage ? '로딩…' : '더 보기'}
