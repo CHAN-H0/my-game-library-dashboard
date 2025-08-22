@@ -27,3 +27,16 @@ export interface Platform {
   name: string;
   slug: string;
 }
+
+export interface GameDetails {
+  id: number;
+  name: string;
+  description_raw?: string;
+  background_image?: string | null;
+  released?: string | null;
+  rating?: number | null;
+  metacritic?: number | null;
+  genres?: Genre[];
+  platforms?: { platform: Platform }[];
+  website?: string | null;
+}
