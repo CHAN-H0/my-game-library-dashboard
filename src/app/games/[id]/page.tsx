@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useGame } from '@/app/games/_hooks/useGame';
 import ErrorBanner from '@/components/games/ErrorBanner';
@@ -10,15 +10,61 @@ import ErrorBanner from '@/components/games/ErrorBanner';
 export default function GameDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawFrom = searchParams?.get('from') ?? '';
+  const backTo = rawFrom.startsWith('/games') ? rawFrom : '/games';
 
   const gameId = useMemo(() => Number(params?.id), [params?.id]);
   const { data, isPending, isError, error, refetch } = useGame(gameId);
 
+  const [expanded, setExpanded] = useState(false);
+  const descriptionRaw = data?.description_raw ?? '';
+  const paragraphs = useMemo(
+    () =>
+      descriptionRaw
+        .split(/\r?\n\s*\r?\n/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    [descriptionRaw]
+  );
+  const totalChars = useMemo(() => descriptionRaw.length, [descriptionRaw]);
+
+  const MIN_TOTAL_TO_CLAMP = 600;
+  const MIN_EXCERPT_CHARS = 280;
+  const LONG_PARA_CHARS = 800;
+  const MAX_EXCERPT_PARAS = 2;
+  const MIN_TOTAL_TO_TOGGLE = 1400;
+  const MIN_HIDDEN_CHARS = 500;
+  const MIN_HIDDEN_RATIO = 0.38;
+
+  const previewParas = useMemo(() => {
+    if (totalChars < MIN_TOTAL_TO_CLAMP) return paragraphs;
+    if (paragraphs.length === 0) return [];
+    const first = paragraphs[0];
+    if (first.length >= MIN_EXCERPT_CHARS) return [first];
+    if (paragraphs.length > 1)
+      return paragraphs.slice(0, Math.min(MAX_EXCERPT_PARAS, paragraphs.length));
+    return [first];
+  }, [paragraphs, totalChars]);
+
+  const previewChars = useMemo(() => previewParas.join('\n\n').length, [previewParas]);
+  const hiddenChars = Math.max(0, totalChars - previewChars);
+  const hiddenRatio = totalChars ? hiddenChars / totalChars : 0;
+  const canToggle =
+    totalChars >= MIN_TOTAL_TO_TOGGLE &&
+    (hiddenChars >= MIN_HIDDEN_CHARS ||
+      hiddenRatio >= MIN_HIDDEN_RATIO ||
+      (previewParas.length === 1 && previewParas[0].length > LONG_PARA_CHARS));
+  const showToggle = canToggle;
+
+  const needsHeightClamp =
+    canToggle && !expanded && previewParas.length === 1 && previewParas[0].length > LONG_PARA_CHARS;
+
   if (!Number.isFinite(gameId)) {
     return (
       <div className="p-6">
-        잘못된 접근입니다.{' '}
-        <Button variant="outline" className="ml-2" onClick={() => router.push('/games')}>
+        잘못된 접근입니다.{` `}
+        <Button variant="outline" className="ml-2" onClick={() => router.push(backTo)}>
           목록으로
         </Button>
       </div>
@@ -38,7 +84,7 @@ export default function GameDetailPage() {
           statusText={e?.status ? `HTTP ${e.status}` : undefined}
           onRetry={() => refetch()}
         />
-        <Button variant="outline" onClick={() => router.push('/games')} aria-label="목록으로">
+        <Button variant="outline" onClick={() => router.push(backTo)} aria-label="목록으로">
           목록으로
         </Button>
       </div>
@@ -47,22 +93,11 @@ export default function GameDetailPage() {
 
   if (!data) return null;
 
-  const {
-    name,
-    background_image,
-    released,
-    rating,
-    metacritic,
-    description_raw,
-    genres,
-    platforms,
-  } = data;
+  const { name, background_image, released, rating, metacritic, genres, platforms } = data;
 
   return (
     <div className="mx-auto max-w-5xl p-6 space-y-6">
-      {/* 상단 헤더 */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        {/* 썸네일 */}
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border sm:w-[360px]">
           {background_image ? (
             <Image
@@ -80,7 +115,6 @@ export default function GameDetailPage() {
           )}
         </div>
 
-        {/* 메타 정보 */}
         <div className="flex-1 space-y-3">
           <h1 className="text-2xl font-semibold leading-tight">{name}</h1>
           <div className="text-sm text-muted-foreground flex flex-wrap gap-2">
@@ -103,19 +137,51 @@ export default function GameDetailPage() {
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={() => router.push('/games')} aria-label="목록으로">
+            <Button variant="outline" onClick={() => router.push(backTo)} aria-label="목록으로">
               목록으로
             </Button>
           </div>
         </div>
       </div>
 
-      {description_raw ? (
-        <section aria-labelledby="desc-title" className="prose dark:prose-invert max-w-none">
+      {descriptionRaw ? (
+        <section aria-labelledby="desc-title" className="max-w-none">
           <h2 id="desc-title" className="sr-only">
             설명
           </h2>
-          <p className="whitespace-pre-wrap leading-relaxed">{description_raw}</p>
+
+          <div
+            id="desc-content"
+            className="prose dark:prose-invert leading-relaxed"
+            aria-live="polite"
+          >
+            {(expanded || !canToggle ? paragraphs : previewParas).map((p, i) => (
+              <p
+                key={i}
+                className={
+                  needsHeightClamp && i === 0
+                    ? 'relative max-h-[16rem] overflow-hidden whitespace-pre-wrap after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:h-16 after:w-full after:bg-gradient-to-t after:from-background after:to-transparent'
+                    : 'whitespace-pre-wrap'
+                }
+              >
+                {p}
+              </p>
+            ))}
+          </div>
+
+          {showToggle && (
+            <div className="mt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+                aria-controls="desc-content"
+              >
+                {expanded ? '접기' : '더보기'}
+              </Button>
+            </div>
+          )}
         </section>
       ) : null}
     </div>
