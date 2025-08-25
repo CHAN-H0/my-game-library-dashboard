@@ -1,7 +1,6 @@
 import rawgClient from '@/lib/api/rawgClient';
 import type { Params } from '@/lib/api/rawgClient';
-import type { GamesListResponse } from '@/types/rawg';
-import type { GameDetails } from '@/types/rawg';
+import type { GamesListResponse, GameDetails, GameScreenshotsResponse } from '@/types/rawg';
 import type { GameFilters, Ordering } from '@/app/games/_utils/filters';
 
 export interface GamesListParams {
@@ -58,6 +57,16 @@ export const games = {
   detail: (id: number | string, opts?: { signal?: AbortSignal; timeoutMs?: number }) =>
     rawgClient.get<GameDetails>(
       `games/${id}`,
+      {},
+      {
+        signal: opts?.signal,
+        timeoutMs: opts?.timeoutMs,
+      }
+    ),
+
+  screenshots: (id: number | string, opts?: { signal?: AbortSignal; timeoutMs?: number }) =>
+    rawgClient.get<GameScreenshotsResponse>(
+      `games/${id}/screenshots`,
       {},
       {
         signal: opts?.signal,

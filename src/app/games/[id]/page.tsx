@@ -6,6 +6,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useGame } from '@/app/games/_hooks/useGame';
 import ErrorBanner from '@/components/games/ErrorBanner';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { games as gamesService } from '@/services/rawg/games';
+import type { Screenshot } from '@/types/rawg';
 
 export default function GameDetailPage() {
   const params = useParams<{ id: string }>();
@@ -184,6 +187,69 @@ export default function GameDetailPage() {
           )}
         </section>
       ) : null}
+
+      <ScreenshotsSection gameId={gameId} gameName={name} />
     </div>
+  );
+}
+
+function ScreenshotsSection({ gameId, gameName }: { gameId: number; gameName: string }) {
+  const {
+    data: shots,
+    isPending,
+    isError,
+  } = useQuery<Screenshot[]>({
+    queryKey: ['gameScreenshots', gameId],
+    queryFn: async () => {
+      const res = await gamesService.screenshots(gameId);
+      return res?.results ?? [];
+    },
+    enabled: Number.isFinite(gameId),
+    placeholderData: keepPreviousData,
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 30,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+  });
+
+  if (isError || !shots || shots.length === 0) return null;
+
+  return (
+    <section aria-labelledby="shots-title" className="max-w-none">
+      <h2 id="shots-title" className="text-lg font-semibold mb-3">
+        스크린샷
+      </h2>
+      <div className="overflow-x-auto">
+        <div
+          role="list"
+          aria-label="스크린샷 목록"
+          className="flex gap-3 pb-2 snap-x snap-mandatory"
+        >
+          {shots.slice(0, 12).map((s) => (
+            <a
+              key={s.id}
+              href={s.image}
+              target="_blank"
+              rel="noopener noreferrer"
+              role="listitem"
+              className="block snap-start"
+              aria-label={`${gameName} 스크린샷 새 탭에서 보기`}
+            >
+              <div className="relative w-[240px] md:w-[320px] aspect-video rounded-lg overflow-hidden border">
+                <Image
+                  src={s.image}
+                  alt={`${gameName} 스크린샷`}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 240px, 320px"
+                />
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+      {isPending && <p className="mt-2 text-sm text-muted-foreground">스크린샷 로딩 중…</p>}
+    </section>
   );
 }

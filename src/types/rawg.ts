@@ -40,3 +40,12 @@ export interface GameDetails {
   platforms?: { platform: Platform }[];
   website?: string | null;
 }
+
+export interface Screenshot {
+  id: number;
+  image: string;
+  width?: number | null;
+  height?: number | null;
+  is_deleted?: boolean;
+}
+export type GameScreenshotsResponse = RawgListResponse<Screenshot>;
