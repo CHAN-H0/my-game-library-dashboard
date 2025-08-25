@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useGame } from '@/app/games/_hooks/useGame';
 import ErrorBanner from '@/components/games/ErrorBanner';
@@ -10,6 +10,9 @@ import ErrorBanner from '@/components/games/ErrorBanner';
 export default function GameDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawFrom = searchParams?.get('from') ?? '';
+  const backTo = rawFrom.startsWith('/games') ? rawFrom : '/games';
 
   const gameId = useMemo(() => Number(params?.id), [params?.id]);
   const { data, isPending, isError, error, refetch } = useGame(gameId);
@@ -61,7 +64,7 @@ export default function GameDetailPage() {
     return (
       <div className="p-6">
         잘못된 접근입니다.{` `}
-        <Button variant="outline" className="ml-2" onClick={() => router.push('/games')}>
+        <Button variant="outline" className="ml-2" onClick={() => router.push(backTo)}>
           목록으로
         </Button>
       </div>
@@ -81,7 +84,7 @@ export default function GameDetailPage() {
           statusText={e?.status ? `HTTP ${e.status}` : undefined}
           onRetry={() => refetch()}
         />
-        <Button variant="outline" onClick={() => router.push('/games')} aria-label="목록으로">
+        <Button variant="outline" onClick={() => router.push(backTo)} aria-label="목록으로">
           목록으로
         </Button>
       </div>
@@ -134,7 +137,7 @@ export default function GameDetailPage() {
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={() => router.push('/games')} aria-label="목록으로">
+            <Button variant="outline" onClick={() => router.push(backTo)} aria-label="목록으로">
               목록으로
             </Button>
           </div>
